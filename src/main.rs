@@ -10,8 +10,24 @@ mod util;
 
 use std::path::Path;
 use std::process::exit;
+use std::ptr::null_mut;
 use std::thread;
 use std::time::Duration;
+
+/// Clears zombie children processes.
+fn clear_zombies() {
+    loop {
+        // Wait on a child without blocking
+        let ret = unsafe {
+            libc::waitpid(-1, null_mut::<libc::c_int>(), libc::WNOHANG)
+        };
+
+        // If not process has been waited, stop
+        if ret <= 0 {
+            break;
+        }
+    }
+}
 
 fn main() {
     println!("Hello world!");
@@ -53,9 +69,9 @@ fn main() {
     // TODO Launch default program with root
 
     println!("Ready! :)");
-    loop {
-        // TODO Wait child processes to discard exit codes
 
+    loop {
+        clear_zombies();
         services_manager.tick();
 
         thread::sleep(Duration::from_millis(1));

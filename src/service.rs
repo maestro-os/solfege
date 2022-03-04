@@ -1,8 +1,12 @@
 //! This modules handles services.
 
 use crate::util;
-use serde::Deserialize;
+use std::fs::File;
+use std::fs;
+use std::io::BufReader;
 use std::io;
+use std::process::Child;
+use std::process::Command;
 
 /// The path to the services directory.
 const SERVICES_PATH: &str = "/etc/solfege/services";
@@ -38,12 +42,12 @@ pub struct ServiceDescriptor {
     /// The GID used to run the service.
     gid: u32,
 
-    /// The command to start the service.
-    start_command: String,
-    /// The command to reload the service.
-    reload_command: Option<String>,
-    /// The command to stop the service.
-    stop_command: Option<String>,
+    /// The program to start the service.
+    start_program: String,
+    /// The program to reload the service.
+    reload_program: Option<String>,
+    /// The program to stop the service.
+    stop_program: Option<String>,
 }
 
 /// Structure representing a service.
@@ -54,6 +58,8 @@ pub struct Service {
     /// The current state of the service.
     state: ServiceState,
 
+    /// The service's current process.
+    process: Option<Child>,
     /// The timestamp of the last crash.
     crash_timestamp: u64,
 }
@@ -70,22 +76,21 @@ impl Service {
     }
 
     /// Starts the service. If the service is already started, the function does nothing.
-    pub fn start(&mut self) {
-        if self.state == ServiceState::Running {
-            return;
+    pub fn start(&mut self) -> io::Result<()> {
+        if self.state != ServiceState::Running {
+            // TODO Use uid and gid
+            self.process = Some(Command::new(&self.desc.start_program).spawn()?);
         }
 
-        // TODO
-        todo!();
+        Ok(())
     }
 
     /// Reloads the service.
     pub fn reload(&mut self) {
         if self.state != ServiceState::Running {
             self.start();
-        } else {
-            // TODO Run the reload command
-            todo!();
+        } else if let Some(reload_prg) = &self.desc.reload_program {
+            Command::new(reload_prg).spawn();
         }
     }
 
@@ -95,8 +100,9 @@ impl Service {
             return;
         }
 
-        // TODO
-        todo!();
+        if let Some(stop_prg) = &self.desc.stop_program {
+            Command::new(stop_prg).spawn();
+        }
     }
 
     /// Restarts the service.
@@ -117,8 +123,27 @@ impl Manager {
     fn list() -> io::Result<Vec<Service>> {
         let mut services = Vec::new();
 
-        // TODO Iterate over services directory
-        // TODO Parse service descriptors and build services
+        let e = fs::read_dir(SERVICES_PATH)?;
+        for entry in e {
+            let e = entry.unwrap();
+            let p = e.path();
+            let file_type = e.file_type().unwrap();
+
+            if file_type.is_file() {
+                let file = File::open(p)?;
+                let reader = BufReader::new(file);
+
+                let desc: ServiceDescriptor = serde_json::from_reader(reader)?;
+                services.push(Service {
+                    desc,
+
+                    state: ServiceState::Stopped,
+
+                    process: None,
+                    crash_timestamp: 0,
+                });
+            }
+        }
 
         Ok(services)
     }
