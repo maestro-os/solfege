@@ -2,6 +2,7 @@
 
 //#![deny(warnings)]
 
+mod fstab;
 mod module;
 mod service;
 mod uname;
@@ -27,7 +28,12 @@ fn main() {
 
     // TODO Init drivers manager
 
-    // TODO Parse /etc/fstab if it exists and mount everything
+    // Mounting default filesystems
+    let _fstab_entries = fstab::parse().unwrap_or_else(| err | {
+        eprintln!("Failed to read the fstab file: {}", err);
+        exit(1);
+    });
+    // TODO Mount all entries
 
     // TODO Launch services
 
