@@ -37,10 +37,10 @@ pub struct ServiceDescriptor {
     /// service won't be restarted automaticaly.
     restart_delay: Option<u64>,
 
-    /// The UID used to run the service.
-    uid: u32,
-    /// The GID used to run the service.
-    gid: u32,
+    /// The user used to run the service.
+    user: String,
+    /// The group used to run the service.
+    group: String,
 
     /// The program to start the service.
     start_program: String,
