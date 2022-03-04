@@ -19,6 +19,12 @@ The following C libraries are required:
 
 
 
+## Modules
+
+At boot, Solfège loads all the default kernel modules located in `/lib/modules/<kernel>-<release>/default`, where `kernel` is the name of the kernel and `release` is the kernel's release.
+
+
+
 ## Services
 
 A service is a daemon which is launched at system startup if enabled.

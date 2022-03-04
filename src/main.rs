@@ -9,12 +9,32 @@ mod uname;
 mod util;
 
 use std::path::Path;
+use std::process::Command;
 use std::process::exit;
 use std::ptr::null_mut;
 use std::thread;
 use std::time::Duration;
 
+/// The path to the file containing the startup program.
+const STARTUP_PROG_PATH: &str = "/etc/solfege/startup";
+
+/// Runs the startup command.
+fn startup() {
+    let prog = std::fs::read_to_string(STARTUP_PROG_PATH).unwrap_or_else(| err | {
+        eprintln!("Failed to open startup program configuration file: {}", err);
+        exit(1);
+    });
+
+    let _ = Command::new(prog).spawn().unwrap_or_else(| err | {
+        eprintln!("Cannot run startup program: {}", err);
+        exit(1);
+    });
+}
+
+// TODO Ensure this doesn't interfer with services
 /// Clears zombie children processes.
+/// This function is necessary because when a process becomes orphan, the kernel gives it to the
+/// init process, which shall dispose of it properly.
 fn clear_zombies() {
     loop {
         // Wait on a child without blocking
@@ -35,11 +55,12 @@ fn main() {
         eprintln!("Cannot retrieve system informations with uname");
         exit(1);
     });
-    println!("Booting {} release {}", uname.sysname, uname.release);
+    println!("Booting systeme with kernel {}, release {}", uname.sysname, uname.release);
 
     // Loading default modules
     println!("Loading modules...");
-    let default_modules_path_str = format!("/lib/modules/maestro-{}/default/", uname.release);
+    let default_modules_path_str = format!("/lib/modules/{}-{}/default/",
+        uname.sysname, uname.release);
     let default_modules_path = Path::new(&default_modules_path_str);
     module::load_all(&default_modules_path).unwrap_or_else(| err | {
         eprintln!("Failed to load default modules: {}", err);
@@ -56,7 +77,10 @@ fn main() {
     });
     for e in fstab_entries {
         println!("Mounting `{}`...", e.get_path());
-        fstab::mount(&e);
+        e.mount().unwrap_or_else(| err | {
+            eprintln!("Failed to mount `{}`: {}", e.get_path(), err);
+            exit(1);
+        });
     }
 
     println!("Launching services...");
@@ -65,8 +89,8 @@ fn main() {
         exit(1);
     });
 
-    // TODO Set signal handlers
-    // TODO Launch default program with root
+    // Running the startup command
+    startup();
 
     println!("Ready! :)");
 

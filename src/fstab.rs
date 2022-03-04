@@ -17,7 +17,7 @@ pub enum FSSpec {
     File(String),
     /// Mounting from the given label.
     Label(String),
-    /// mountiing from a partition UUID.
+    /// Mountiing from a partition UUID.
     Uuid(String),
 }
 
@@ -54,6 +54,12 @@ impl FSTabEntry {
     /// Returns the mountpath.
     pub fn get_path(&self) -> &String {
         &self.fs_file
+    }
+
+    /// Mounts the given entry.
+    pub fn mount(&self) -> io::Result<()> {
+        // TODO
+        todo!();
     }
 }
 
@@ -199,12 +205,6 @@ pub fn parse(path: Option<&str>) -> io::Result<Vec<FSTabEntry>> {
     }
 
     Ok(entries)
-}
-
-/// Mounts the given entry.
-pub fn mount(_e: &FSTabEntry) -> io::Result<()> {
-    // TODO
-    todo!();
 }
 
 #[cfg(test)]

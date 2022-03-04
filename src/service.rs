@@ -78,6 +78,8 @@ impl Service {
     /// Starts the service. If the service is already started, the function does nothing.
     pub fn start(&mut self) -> io::Result<()> {
         if self.state != ServiceState::Running {
+            println!("Starting service `{}`...", self.desc.name);
+
             // TODO Use uid and gid
             self.process = Some(Command::new(&self.desc.start_program).spawn()?);
         }
@@ -86,29 +88,35 @@ impl Service {
     }
 
     /// Reloads the service.
-    pub fn reload(&mut self) {
+    pub fn reload(&mut self) -> io::Result<()> {
         if self.state != ServiceState::Running {
-            self.start();
+            self.start()?;
         } else if let Some(reload_prg) = &self.desc.reload_program {
-            Command::new(reload_prg).spawn();
+            println!("Reloading service `{}`...", self.desc.name);
+            Command::new(reload_prg).spawn()?;
         }
+
+        Ok(())
     }
 
     /// Stops the service. If the service is already stopped, the function does nothing.
-    pub fn stop(&mut self) {
-        if self.state != ServiceState::Running {
-            return;
+    pub fn stop(&mut self) -> io::Result<()> {
+        if self.state == ServiceState::Running {
+            if let Some(stop_prg) = &self.desc.stop_program {
+                println!("Stopping service `{}`...", self.desc.name);
+                Command::new(stop_prg).spawn()?;
+            }
         }
 
-        if let Some(stop_prg) = &self.desc.stop_program {
-            Command::new(stop_prg).spawn();
-        }
+        Ok(())
     }
 
     /// Restarts the service.
-    pub fn restart(&mut self) {
-        self.stop();
-        self.start();
+    pub fn restart(&mut self) -> io::Result<()> {
+        self.stop()?;
+        self.start()?;
+
+        Ok(())
     }
 }
 
@@ -154,7 +162,7 @@ impl Manager {
 
         for s in &mut services {
             if s.is_enabled() {
-                s.start();
+                s.start()?;
             }
         }
 
@@ -177,7 +185,7 @@ impl Manager {
 
             if let Some(delay) = s.desc.restart_delay {
                 if util::get_timestamp() >= s.crash_timestamp + delay {
-                    s.start();
+                    let _ = s.start();
                 }
             }
         }
