@@ -6,9 +6,12 @@ mod fstab;
 mod module;
 mod service;
 mod uname;
+mod util;
 
 use std::path::Path;
 use std::process::exit;
+use std::thread;
+use std::time::Duration;
 
 fn main() {
     println!("Hello world!");
@@ -19,6 +22,7 @@ fn main() {
     println!("Booting {} release {}", uname.sysname, uname.release);
 
     // Loading default modules
+    println!("Loading modules...");
     let default_modules_path_str = format!("/lib/modules/maestro-{}/default/", uname.release);
     let default_modules_path = Path::new(&default_modules_path_str);
     module::load_all(&default_modules_path).unwrap_or_else(| err | {
@@ -29,18 +33,31 @@ fn main() {
     // TODO Init drivers manager
 
     // Mounting default filesystems
-    let _fstab_entries = fstab::parse(None).unwrap_or_else(| err | {
+    println!("Mounting fstab filesystems...");
+    let fstab_entries = fstab::parse(None).unwrap_or_else(| err | {
         eprintln!("Failed to read the fstab file: {}", err);
         exit(1);
     });
-    // TODO Mount all entries
+    for e in fstab_entries {
+        println!("Mounting `{}`...", e.get_path());
+        fstab::mount(&e);
+    }
 
-    // TODO Launch services
-
-    // TODO Launch default program with root
+    println!("Launching services...");
+    let mut services_manager = service::Manager::new().unwrap_or_else(| err | {
+        eprintln!("Failed to launch the services manager: {}", err);
+        exit(1);
+    });
 
     // TODO Set signal handlers
-    // TODO Wait child processes to discard exit codes
+    // TODO Launch default program with root
 
-    loop {}
+    println!("Ready! :)");
+    loop {
+        // TODO Wait child processes to discard exit codes
+
+        services_manager.tick();
+
+        thread::sleep(Duration::from_millis(1));
+    }
 }

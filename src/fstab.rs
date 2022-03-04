@@ -50,6 +50,13 @@ pub struct FSTabEntry {
     fs_passno: u32,
 }
 
+impl FSTabEntry {
+    /// Returns the mountpath.
+    pub fn get_path(&self) -> &String {
+        &self.fs_file
+    }
+}
+
 /// Skips whitespace on the given iterator.
 fn skip_whitespaces(chars: &mut Peekable<Chars>) {
     while let Some(c) = chars.peek() {
@@ -192,6 +199,12 @@ pub fn parse(path: Option<&str>) -> io::Result<Vec<FSTabEntry>> {
     }
 
     Ok(entries)
+}
+
+/// Mounts the given entry.
+pub fn mount(_e: &FSTabEntry) -> io::Result<()> {
+    // TODO
+    todo!();
 }
 
 #[cfg(test)]
