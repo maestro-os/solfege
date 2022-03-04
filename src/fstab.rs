@@ -11,6 +11,7 @@ use std::str::Chars;
 const FSTAB_PATH: &str = "/etc/fstab";
 
 /// Enumeration of possible filesystem sources types.
+#[derive(Debug, Eq, PartialEq)]
 pub enum FSSpec {
     /// Mounting from a file.
     File(String),
@@ -174,11 +175,12 @@ fn parse_line(line: &str) -> Option<FSTabEntry> {
 }
 
 /// Parses the fstab file and returns the list of entries.
+/// `path` is the path to the fstab file. If None, the function takes the default path.
 /// Invalid entries are ignored.
-pub fn parse() -> io::Result<Vec<FSTabEntry>> {
+pub fn parse(path: Option<&str>) -> io::Result<Vec<FSTabEntry>> {
     let mut entries = Vec::new();
 
-    let file = File::open(FSTAB_PATH)?;
+    let file = File::open(path.unwrap_or(FSTAB_PATH))?;
     let reader = BufReader::new(file);
 
     for l in reader.lines() {
@@ -190,4 +192,67 @@ pub fn parse() -> io::Result<Vec<FSTabEntry>> {
     }
 
     Ok(entries)
+}
+
+#[cfg(test)]
+mod test {
+	use super::*;
+
+	#[test]
+	fn fstab_empty() {
+        let entries = parse(Some("tests/fstab/empty")).unwrap();
+        assert!(entries.is_empty());
+	}
+
+	#[test]
+	fn fstab_comments_only() {
+        let entries = parse(Some("tests/fstab/comments_only")).unwrap();
+        assert!(entries.is_empty());
+	}
+
+	#[test]
+	fn fstab_single() {
+        let entries = parse(Some("tests/fstab/single")).unwrap();
+        assert_eq!(entries.len(), 1);
+
+        assert_eq!(entries[0].fs_spec, FSSpec::File("/dev/sda1".to_string()));
+        assert_eq!(entries[0].fs_file, "/");
+        assert_eq!(entries[0].fs_vfstype, "ext4");
+        assert_eq!(entries[0].fs_mntops[0], "rw");
+        assert_eq!(entries[0].fs_freq, false);
+        assert_eq!(entries[0].fs_passno, 1);
+	}
+
+	#[test]
+	fn fstab_several() {
+        let entries = parse(Some("tests/fstab/several")).unwrap();
+        assert_eq!(entries.len(), 3);
+
+        assert_eq!(entries[0].fs_spec, FSSpec::File("/dev/sda1".to_string()));
+        assert_eq!(entries[0].fs_file, "/");
+        assert_eq!(entries[0].fs_vfstype, "ext4");
+        assert_eq!(entries[0].fs_mntops[0], "rw");
+        assert_eq!(entries[0].fs_freq, false);
+        assert_eq!(entries[0].fs_passno, 1);
+
+        assert_eq!(entries[1].fs_spec, FSSpec::Label("UEFI".to_string()));
+        assert_eq!(entries[1].fs_file, "/");
+        assert_eq!(entries[1].fs_vfstype, "ext4");
+        assert_eq!(entries[1].fs_mntops[0], "defaults");
+        assert_eq!(entries[1].fs_mntops[1], "rw");
+        assert_eq!(entries[1].fs_freq, false);
+        assert_eq!(entries[1].fs_passno, 1);
+
+        assert_eq!(entries[2].fs_spec,
+            FSSpec::Uuid("5fcd5a6e-a326-43fd-8b39-f6e1238bc54f".to_string()));
+        assert_eq!(entries[2].fs_file, "/");
+        assert_eq!(entries[2].fs_vfstype, "ext4");
+        assert_eq!(entries[2].fs_mntops[0], "suid");
+        assert_eq!(entries[2].fs_mntops[1], "rw");
+        assert_eq!(entries[2].fs_freq, false);
+        assert_eq!(entries[2].fs_passno, 1);
+	}
+
+    // TODO Test with quotes
+    // TODO Test with invalid entries
 }

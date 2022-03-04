@@ -1,0 +1,9 @@
+# First entry
+/dev/sda1	/	ext4	rw	0	1
+
+# Second entry
+# Random comment :)
+LABEL=UEFI	/	ext4	defaults,rw	0	1
+
+# Third entry
+UUID=5fcd5a6e-a326-43fd-8b39-f6e1238bc54f	/	ext4	suid,rw	0	1 # Another random comment :)

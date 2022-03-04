@@ -29,7 +29,7 @@ fn main() {
     // TODO Init drivers manager
 
     // Mounting default filesystems
-    let _fstab_entries = fstab::parse().unwrap_or_else(| err | {
+    let _fstab_entries = fstab::parse(None).unwrap_or_else(| err | {
         eprintln!("Failed to read the fstab file: {}", err);
         exit(1);
     });
