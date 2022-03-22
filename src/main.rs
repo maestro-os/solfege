@@ -55,7 +55,7 @@ fn main() {
         eprintln!("Cannot retrieve system informations with uname");
         exit(1);
     });
-    println!("Booting systeme with kernel {}, release {}", uname.sysname, uname.release);
+    println!("Booting system with {} kernel, release {}", uname.sysname, uname.release);
 
     // Loading default modules
     println!("Loading modules...");
