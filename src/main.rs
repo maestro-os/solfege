@@ -58,7 +58,7 @@ fn main() {
     println!("Booting system with {} kernel, release {}", uname.sysname, uname.release);
 
     // Loading default modules
-    println!("Loading modules...");
+    println!("Loading default modules...");
     let default_modules_path_str = format!("/lib/modules/{}-{}/default/",
         uname.sysname, uname.release);
     let default_modules_path = Path::new(&default_modules_path_str);
