@@ -1,15 +1,31 @@
 //! This module handles kernel modules management.
 
+use std::ffi::CString;
 use std::fs;
+use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
+
+extern "C" {
+	fn load_module(path: *const u8) -> bool;
+}
 
 /// Loads the module at the given path.
 /// On fail, the function returns an error.
 pub fn load(path: &Path) -> Result<(), String> {
     println!("Loading module {}...", path.display());
 
-    // TODO
-    todo!();
+	let mut c_path = path.as_os_str().as_bytes().to_vec();
+	c_path.push(0);
+
+	let success = unsafe {
+		load_module(c_path.as_ptr())
+	};
+    if !success {
+		// TODO Handle error
+		todo!();
+	}
+
+	Ok(())
 }
 
 /// Unloads the module with the given name.
