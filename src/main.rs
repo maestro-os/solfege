@@ -20,10 +20,11 @@ const STARTUP_PROG_PATH: &str = "/etc/solfege/startup";
 
 /// Runs the startup command.
 fn startup() {
-    let prog = std::fs::read_to_string(STARTUP_PROG_PATH).unwrap_or_else(| err | {
+    let mut prog = std::fs::read_to_string(STARTUP_PROG_PATH).unwrap_or_else(| err | {
         eprintln!("Failed to open startup program configuration file: {}", err);
         exit(1);
     });
+	prog.trim();
 
     let _ = Command::new(prog).spawn().unwrap_or_else(| err | {
         eprintln!("Cannot run startup program: {}", err);
