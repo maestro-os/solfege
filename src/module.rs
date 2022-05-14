@@ -1,6 +1,5 @@
 //! This module handles kernel modules management.
 
-use std::ffi::CString;
 use std::fs;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;

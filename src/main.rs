@@ -24,7 +24,7 @@ fn startup() {
         eprintln!("Failed to open startup program configuration file: {}", err);
         exit(1);
     });
-	prog.trim();
+	prog = prog.trim().to_string();
 
     let _ = Command::new(prog).spawn().unwrap_or_else(| err | {
         eprintln!("Cannot run startup program: {}", err);
