@@ -5,6 +5,7 @@
 mod fstab;
 mod module;
 mod service;
+mod tty;
 mod uname;
 mod util;
 
@@ -36,16 +37,11 @@ fn startup() {
 /// Clears zombie children processes.
 /// This function is necessary because when a process becomes orphan, the kernel gives it to the
 /// init process, which shall dispose of it properly.
-fn clear_zombies() {
+fn clear_zombies() -> ! {
     loop {
         // Wait on a child without blocking
-        let ret = unsafe {
-            libc::waitpid(-1, null_mut::<libc::c_int>(), libc::WNOHANG)
-        };
-
-        // If not process has been waited, stop
-        if ret <= 0 {
-            break;
+        unsafe {
+            libc::waitpid(-1, null_mut::<libc::c_int>(), 0);
         }
     }
 }
@@ -57,6 +53,10 @@ fn main() {
         exit(1);
     });
     println!("Booting system with {} kernel, release {}", uname.sysname, uname.release);
+
+	// Initialize TTY
+    println!("Initializing current TTY...");
+	tty::init();
 
     // Loading default modules
     println!("Loading default modules...");
@@ -95,10 +95,7 @@ fn main() {
 
     println!("Ready! :)");
 
-    loop {
-        clear_zombies();
-        services_manager.tick();
+    // TODO Run in another thread to restart dead services: services_manager.tick();
 
-        thread::sleep(Duration::from_millis(1));
-    }
+	clear_zombies();
 }
