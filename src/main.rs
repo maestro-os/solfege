@@ -58,18 +58,6 @@ fn main() {
     println!("Initializing current TTY...");
 	tty::init();
 
-    // Loading default modules
-    println!("Loading default modules...");
-    let default_modules_path_str = format!("/lib/modules/{}-{}/default/",
-        uname.sysname, uname.release);
-    let default_modules_path = Path::new(&default_modules_path_str);
-    module::load_all(&default_modules_path).unwrap_or_else(| err | {
-        eprintln!("Failed to load default modules: {}", err);
-        exit(1);
-    });
-
-    // TODO Init drivers manager
-
     // Mounting default filesystems
     println!("Mounting fstab filesystems...");
     let fstab_entries = fstab::parse(None).unwrap_or_else(| err | {
@@ -83,6 +71,18 @@ fn main() {
             exit(1);
         });
     }
+
+    // Loading default modules
+    println!("Loading default modules...");
+    let default_modules_path_str = format!("/lib/modules/{}-{}/default/",
+        uname.sysname, uname.release);
+    let default_modules_path = Path::new(&default_modules_path_str);
+    module::load_all(&default_modules_path).unwrap_or_else(| err | {
+        eprintln!("Failed to load default modules: {}", err);
+        exit(1);
+    });
+
+    // TODO Init drivers manager
 
     println!("Launching services...");
     let mut services_manager = service::Manager::new().unwrap_or_else(| err | {

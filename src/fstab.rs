@@ -17,7 +17,7 @@ pub enum FSSpec {
     File(String),
     /// Mounting from the given label.
     Label(String),
-    /// Mountiing from a partition UUID.
+    /// Mounting from a partition UUID.
     Uuid(String),
 }
 
