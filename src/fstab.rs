@@ -1,10 +1,14 @@
 //! This module handles the fstab file, which contains the list of filesystems to mount at boot.
 
+use std::error::Error;
+use std::ffi::CString;
+use std::ffi::c_void;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io;
 use std::iter::Peekable;
+use std::ptr::null;
 use std::str::Chars;
 
 /// The path to the fstab file.
@@ -32,6 +36,15 @@ impl FSSpec {
             Self::File(s)
         }
     }
+
+	/// Returns a string corresponding to the spec.
+	pub fn as_str(&self) -> String {
+		match self {
+			Self::File(s) => s.clone(),
+			Self::Label(s) => format!("LABEL={}", s),
+			Self::Uuid(s) => format!("UUID={}", s),
+		}
+	}
 }
 
 /// Structure representing an entry in the fstab file.
@@ -50,6 +63,12 @@ pub struct FSTabEntry {
     fs_passno: u32,
 }
 
+extern "C" {
+	/// Mounts the given filesystem.
+	fn mount_fs(source: *const i8, target: *const i8, filesystemtype: *const i8,
+		mountflags: u32, data: *const c_void) -> i32;
+}
+
 impl FSTabEntry {
     /// Returns the mountpath.
     pub fn get_path(&self) -> &String {
@@ -57,9 +76,23 @@ impl FSTabEntry {
     }
 
     /// Mounts the given entry.
-    pub fn mount(&self) -> io::Result<()> {
-        // TODO
-        todo!();
+    pub fn mount(&self) -> Result<(), Box<dyn Error>> {
+		let result = unsafe {
+			mount_fs(
+				CString::new(self.fs_spec.as_str())?.as_ptr(),
+				CString::new(self.fs_file.clone())?.as_ptr(),
+				CString::new(self.fs_vfstype.clone())?.as_ptr(),
+				0, // TODO
+				null(), // TODO
+			)
+		};
+
+		if result != 0 {
+			Ok(())
+		} else {
+			Err(format!("Failed to mount `{}` into `{}`!",
+				self.fs_spec.as_str(), self.fs_file).into())
+		}
     }
 }
 
