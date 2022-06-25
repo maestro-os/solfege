@@ -1,8 +1,13 @@
 //! This module implements a call to uname. Allowing to retrieve various informations.
 
 use libc::c_char;
+use std::error::Error;
 use std::ffi::CStr;
+use std::fs;
 use std::mem;
+
+/// The path to the hostname file.
+const HOSTNAME_FILE: &str = "/etc/hostname";
 
 /// Structure containing the final informations to be returned outside of this module.
 #[derive(Debug)]
@@ -49,4 +54,15 @@ impl UnameInfo {
             Err(())
         }
     }
+}
+
+/// Sets the system's hostname according to the hostname file.
+/// If the file is not present, the function doesn't do anything.
+pub fn set_hostname() -> Result<(), Box<dyn Error>> {
+	let hostname = fs::read(HOSTNAME_FILE)?;
+	unsafe {
+		libc::sethostname(hostname.as_ptr() as _, hostname.len());
+	}
+
+	Ok(())
 }

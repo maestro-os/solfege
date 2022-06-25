@@ -48,6 +48,9 @@ fn clear_zombies() -> ! {
 
 fn main() {
     println!("Hello world!");
+	uname::set_hostname().unwrap_or_else(| e | {
+		eprintln!("Cannot set system's hostname: {}", e);
+	});
     let uname = uname::UnameInfo::get().unwrap_or_else(| _ | {
         eprintln!("Cannot retrieve system informations with uname");
         exit(1);
