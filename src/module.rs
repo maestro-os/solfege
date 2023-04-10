@@ -2,8 +2,8 @@
 
 use crate::uname::UnameInfo;
 use std::ffi::c_int;
-use std::fs::File;
 use std::fs;
+use std::fs::File;
 use std::io;
 use std::os::fd::AsRawFd;
 use std::path::Path;
@@ -62,11 +62,8 @@ pub fn load_all(path: &Path) -> io::Result<()> {
 
 /// Loads default modules.
 pub fn load_default(uname: &UnameInfo) -> io::Result<()> {
-	let default_modules_path: PathBuf = format!(
-		"/lib/modules/{}-{}/default/",
-		uname.sysname,
-		uname.release
-	).into();
+	let default_modules_path: PathBuf =
+		format!("/lib/modules/{}-{}/default/", uname.sysname, uname.release).into();
 
 	load_all(&default_modules_path)
 }

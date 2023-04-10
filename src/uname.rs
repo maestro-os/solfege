@@ -66,9 +66,7 @@ impl UnameInfo {
 /// If the file is not present, the function doesn't do anything.
 pub fn set_hostname() -> io::Result<()> {
 	let hostname = fs::read(HOSTNAME_FILE)?;
-	let ret = unsafe {
-		libc::sethostname(hostname.as_ptr() as _, hostname.len())
-	};
+	let ret = unsafe { libc::sethostname(hostname.as_ptr() as _, hostname.len()) };
 
 	if ret == 0 {
 		Ok(())

@@ -1,9 +1,19 @@
-name: Testing
+name: Check
 on: push
 jobs:
-    test:
+    Format:
+        runs-on: [self-hosted, linux]
+        steps:
+            - uses: actions/checkout@v2
+            - run: "cargo fmt --check"
+    Build:
         runs-on: [self-hosted, linux]
         steps:
             - uses: actions/checkout@v2
             - run: "cargo build"
+            - run: "cargo build --release"
+    Test:
+        runs-on: [self-hosted, linux]
+        steps:
+            - uses: actions/checkout@v2
             - run: "cargo test"

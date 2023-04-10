@@ -91,8 +91,7 @@ impl Service {
 			println!("Starting service `{}`...", self.desc.name);
 
 			// TODO Use uid and gid
-			let process = Command::new(&self.desc.program_path)
-				.spawn()?;
+			let process = Command::new(&self.desc.program_path).spawn()?;
 
 			self.process = Some(process);
 			self.state = ServiceState::Running;
@@ -156,7 +155,7 @@ impl Manager {
 					Err(_e) => {
 						// TODO
 						todo!();
-					},
+					}
 				};
 			}
 		}
@@ -186,7 +185,8 @@ impl Manager {
 
 	/// Returns the service with the given PID.
 	pub fn get_service(&mut self, pid: u32) -> Option<&mut Service> {
-		self.services.iter_mut()
+		self.services
+			.iter_mut()
 			.filter(|s| s.process.as_ref().map(|c| c.id()) == Some(pid))
 			.next()
 	}
@@ -195,9 +195,7 @@ impl Manager {
 	///
 	/// This function is used to restart services that died.
 	pub fn tick(&mut self) {
-		let pid = unsafe {
-			libc::waitpid(-1, null_mut::<libc::c_int>(), 0)
-		};
+		let pid = unsafe { libc::waitpid(-1, null_mut::<libc::c_int>(), 0) };
 		if pid < 0 {
 			// TODO sleep?
 			return;

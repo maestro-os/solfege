@@ -3,9 +3,9 @@
 use std::error::Error;
 use std::ffi::CString;
 use std::fs::File;
+use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
-use std::io;
 use std::iter::Peekable;
 use std::ptr::null;
 use std::str::Chars;
@@ -87,15 +87,13 @@ impl FSTabEntry {
 		if result == 0 {
 			Ok(())
 		} else {
-			Err(
-				format!(
-					"Failed to mount `{}` into `{}`: {}",
-					self.fs_spec.as_string(),
-					self.fs_file,
-					io::Error::last_os_error()
-				)
-				.into()
+			Err(format!(
+				"Failed to mount `{}` into `{}`: {}",
+				self.fs_spec.as_string(),
+				self.fs_file,
+				io::Error::last_os_error()
 			)
+			.into())
 		}
 	}
 }
