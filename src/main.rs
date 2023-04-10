@@ -9,32 +9,34 @@ mod tty;
 mod uname;
 mod util;
 
-use std::path::Path;
-use std::process::exit;
+use std::fs;
 use std::process::Command;
+use std::process::exit;
 use std::ptr::null_mut;
-use std::thread;
-use std::time::Duration;
 
 /// The path to the file containing the startup program.
 const STARTUP_PROG_PATH: &str = "/etc/solfege/startup";
 
 /// Runs the startup command.
 fn startup() {
-	let mut prog = std::fs::read_to_string(STARTUP_PROG_PATH).unwrap_or_else(|err| {
-		eprintln!("Failed to open startup program configuration file: {}", err);
-		exit(1);
-	});
-	prog = prog.trim().to_string();
+	let prog = fs::read_to_string(STARTUP_PROG_PATH)
+		.unwrap_or_else(|err| {
+			eprintln!("Failed to open startup program configuration file: {}", err);
+			exit(1);
+		});
+	let prog = prog.trim();
 
-	let _ = Command::new(prog).spawn().unwrap_or_else(|err| {
-		eprintln!("Cannot run startup program: {}", err);
-		exit(1);
-	});
+	Command::new(prog)
+		.spawn()
+		.unwrap_or_else(|err| {
+			eprintln!("Cannot run startup program: {}", err);
+			exit(1);
+		});
 }
 
 // TODO Ensure this doesn't interfer with services
 /// Clears zombie children processes.
+///
 /// This function is necessary because when a process becomes orphan, the kernel gives it to the
 /// init process, which shall dispose of it properly.
 fn clear_zombies() -> ! {
@@ -80,26 +82,20 @@ fn main() {
 
 	// Loading default modules
 	println!("Loading default modules...");
-	let default_modules_path_str =
-		format!("/lib/modules/{}-{}/default/", uname.sysname, uname.release);
-	let default_modules_path = Path::new(&default_modules_path_str);
-	module::load_all(&default_modules_path).unwrap_or_else(|err| {
-		eprintln!("Failed to load default modules: {}", err);
-		exit(1);
-	});
-
-	// TODO Init drivers manager
+	module::load_default(&uname)
+		.unwrap_or_else(|err| {
+			eprintln!("Failed to load default modules: {}", err);
+			exit(1);
+		});
 
 	println!("Launching services...");
-	let mut services_manager = service::Manager::new().unwrap_or_else(|err| {
+	let mut _services_manager = service::Manager::new().unwrap_or_else(|err| {
 		eprintln!("Failed to launch the services manager: {}", err);
 		exit(1);
 	});
 
 	// Running the startup command
 	startup();
-
-	println!("Ready! :)");
 
 	// TODO Run in another thread to restart dead services: services_manager.tick();
 
