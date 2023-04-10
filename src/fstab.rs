@@ -227,7 +227,7 @@ fn parse_line(line: &str) -> Option<FSTabEntry> {
 
 /// Parses the fstab file and returns the list of entries.
 ///
-/// `path` is the path to the fstab file./ If None, the function takes the default path.
+/// `path` is the path to the fstab file. If `None`, the function takes the default path.
 ///
 /// Invalid entries are ignored.
 pub fn parse(path: Option<&str>) -> io::Result<Vec<FSTabEntry>> {

@@ -1,9 +1,7 @@
 //! This modules handles services.
 
 use serde::Deserialize;
-use std::fs::File;
 use std::fs;
-use std::io::BufReader;
 use std::io;
 use std::path::PathBuf;
 use std::process::Child;
@@ -45,8 +43,8 @@ pub struct ServiceDescriptor {
 	/// The group used to run the service.
 	group: String,
 
-	/// The program to start the service.
-	start_program: PathBuf,
+	/// The path to the program of the service.
+	program_path: PathBuf,
 }
 
 /// Structure representing a service.
@@ -93,7 +91,7 @@ impl Service {
 			println!("Starting service `{}`...", self.desc.name);
 
 			// TODO Use uid and gid
-			let process = Command::new(&self.desc.start_program)
+			let process = Command::new(&self.desc.program_path)
 				.spawn()?;
 
 			self.process = Some(process);
@@ -151,11 +149,15 @@ impl Manager {
 			let file_type = e.file_type()?;
 
 			if file_type.is_file() {
-				let file = File::open(p)?;
-				let reader = BufReader::new(file);
+				let content = fs::read_to_string(p)?;
 
-				let desc: ServiceDescriptor = serde_json::from_reader(reader)?;
-				services.push(Service::from(desc));
+				match toml::from_str::<ServiceDescriptor>(&content) {
+					Ok(desc) => services.push(Service::from(desc)),
+					Err(_e) => {
+						// TODO
+						todo!();
+					},
+				};
 			}
 		}
 
