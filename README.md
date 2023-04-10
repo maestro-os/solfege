@@ -16,14 +16,6 @@ For cross compilation, use the `--target` flag with the appropriate target tripl
 
 
 
-### Dependencies
-
-The following C libraries are required:
-- libc
-- libunwind
-
-
-
 ## Documentation
 
 Documentation can be found in the book, which can be built using the command:
