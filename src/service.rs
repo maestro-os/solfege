@@ -1,12 +1,14 @@
 //! This modules handles services.
 
-use crate::util;
-use std::fs;
+use serde::Deserialize;
 use std::fs::File;
-use std::io;
+use std::fs;
 use std::io::BufReader;
+use std::io;
+use std::path::PathBuf;
 use std::process::Child;
 use std::process::Command;
+use std::ptr::null_mut;
 
 /// The path to the services directory.
 const SERVICES_PATH: &str = "/etc/solfege/services";
@@ -23,18 +25,19 @@ pub enum ServiceState {
 }
 
 /// Structure representing a service as a file.
-#[derive(serde::Deserialize)]
+#[derive(Deserialize)]
 pub struct ServiceDescriptor {
 	/// The service's name.
 	name: String,
 	/// The service's description.
-	description: String,
+	desc: String,
 
 	/// Tells whether the service is enabled.
 	enabled: bool,
 
-	/// The delay in milliseconds before restarting the service after it crashed. If None, the
-	/// service won't be restarted automaticaly.
+	/// The delay in milliseconds before restarting the service after it crashed.
+	///
+	/// If `None`, the service won't be restarted automaticaly.
 	restart_delay: Option<u64>,
 
 	/// The user used to run the service.
@@ -43,11 +46,7 @@ pub struct ServiceDescriptor {
 	group: String,
 
 	/// The program to start the service.
-	start_program: String,
-	/// The program to reload the service.
-	reload_program: Option<String>,
-	/// The program to stop the service.
-	stop_program: Option<String>,
+	start_program: PathBuf,
 }
 
 /// Structure representing a service.
@@ -62,6 +61,19 @@ pub struct Service {
 	process: Option<Child>,
 	/// The timestamp of the last crash.
 	crash_timestamp: u64,
+}
+
+impl From<ServiceDescriptor> for Service {
+	fn from(desc: ServiceDescriptor) -> Self {
+		Self {
+			desc,
+
+			state: ServiceState::Stopped,
+
+			process: None,
+			crash_timestamp: 0,
+		}
+	}
 }
 
 impl Service {
@@ -81,7 +93,11 @@ impl Service {
 			println!("Starting service `{}`...", self.desc.name);
 
 			// TODO Use uid and gid
-			self.process = Some(Command::new(&self.desc.start_program).spawn()?);
+			let process = Command::new(&self.desc.start_program)
+				.spawn()?;
+
+			self.process = Some(process);
+			self.state = ServiceState::Running;
 		}
 
 		Ok(())
@@ -89,24 +105,21 @@ impl Service {
 
 	/// Reloads the service.
 	pub fn reload(&mut self) -> io::Result<()> {
-		if self.state != ServiceState::Running {
-			self.start()?;
-		} else if let Some(reload_prg) = &self.desc.reload_program {
-			println!("Reloading service `{}`...", self.desc.name);
-			Command::new(reload_prg).spawn()?;
+		if self.state == ServiceState::Running {
+			self.stop()?;
 		}
 
-		Ok(())
+		self.start()
 	}
 
 	/// Stops the service. If the service is already stopped, the function does nothing.
 	pub fn stop(&mut self) -> io::Result<()> {
-		if self.state == ServiceState::Running {
-			if let Some(stop_prg) = &self.desc.stop_program {
-				println!("Stopping service `{}`...", self.desc.name);
-				Command::new(stop_prg).spawn()?;
-			}
+		if let Some(ref mut process) = self.process {
+			process.kill()?;
+			self.process = None;
 		}
+
+		self.state = ServiceState::Stopped;
 
 		Ok(())
 	}
@@ -133,23 +146,16 @@ impl Manager {
 
 		let e = fs::read_dir(SERVICES_PATH)?;
 		for entry in e {
-			let e = entry.unwrap();
+			let e = entry?;
 			let p = e.path();
-			let file_type = e.file_type().unwrap();
+			let file_type = e.file_type()?;
 
 			if file_type.is_file() {
 				let file = File::open(p)?;
 				let reader = BufReader::new(file);
 
 				let desc: ServiceDescriptor = serde_json::from_reader(reader)?;
-				services.push(Service {
-					desc,
-
-					state: ServiceState::Stopped,
-
-					process: None,
-					crash_timestamp: 0,
-				});
+				services.push(Service::from(desc));
 			}
 		}
 
@@ -176,18 +182,30 @@ impl Manager {
 		&self.services
 	}
 
-	/// Ticks the manager. This function is used to restart services that died.
-	pub fn tick(&mut self) {
-		for s in &mut self.services {
-			if !s.is_enabled() || s.get_state() != ServiceState::Crashed {
-				continue;
-			}
+	/// Returns the service with the given PID.
+	pub fn get_service(&mut self, pid: u32) -> Option<&mut Service> {
+		self.services.iter_mut()
+			.filter(|s| s.process.as_ref().map(|c| c.id()) == Some(pid))
+			.next()
+	}
 
-			if let Some(delay) = s.desc.restart_delay {
-				if util::get_timestamp() >= s.crash_timestamp + delay {
-					let _ = s.start();
-				}
-			}
+	/// Ticks the manager.
+	///
+	/// This function is used to restart services that died.
+	pub fn tick(&mut self) {
+		let pid = unsafe {
+			libc::waitpid(-1, null_mut::<libc::c_int>(), 0)
+		};
+		if pid < 0 {
+			// TODO sleep?
+			return;
 		}
+
+		let Some(_service) = self.get_service(pid as u32) else {
+			// An orphan process has been assigned to the current process, then died
+			return;
+		};
+
+		// TODO update process state
 	}
 }

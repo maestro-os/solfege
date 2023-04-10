@@ -1,15 +1,15 @@
 //! This module handles the fstab file, which contains the list of filesystems to mount at boot.
 
 use std::error::Error;
-use std::ffi::c_void;
 use std::ffi::CString;
 use std::fs::File;
-use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::io;
 use std::iter::Peekable;
 use std::ptr::null;
 use std::str::Chars;
+use std::str::FromStr;
 
 /// The path to the fstab file.
 const FSTAB_PATH: &str = "/etc/fstab";
@@ -25,20 +25,23 @@ pub enum FSSpec {
 	Uuid(String),
 }
 
-impl FSSpec {
-	/// Returns the value corresponding to the given string.
-	pub fn from_str(s: String) -> Self {
+impl FromStr for FSSpec {
+	type Err = ();
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		if s.starts_with("LABEL=") {
-			Self::Label(String::from(&s[6..]))
+			Ok(Self::Label(String::from(&s[6..])))
 		} else if s.starts_with("UUID=") {
-			Self::Uuid(String::from(&s[5..]))
+			Ok(Self::Uuid(String::from(&s[5..])))
 		} else {
-			Self::File(s)
+			Ok(Self::File(s.to_string()))
 		}
 	}
+}
 
+impl FSSpec {
 	/// Returns a string corresponding to the spec.
-	pub fn as_str(&self) -> String {
+	pub fn as_string(&self) -> String {
 		match self {
 			Self::File(s) => s.clone(),
 			Self::Label(s) => format!("LABEL={}", s),
@@ -63,17 +66,6 @@ pub struct FSTabEntry {
 	fs_passno: u32,
 }
 
-extern "C" {
-	/// Mounts the given filesystem.
-	fn mount_fs(
-		source: *const i8,
-		target: *const i8,
-		filesystemtype: *const i8,
-		mountflags: u32,
-		data: *const c_void,
-	) -> i32;
-}
-
 impl FSTabEntry {
 	/// Returns the mountpath.
 	pub fn get_path(&self) -> &String {
@@ -83,8 +75,8 @@ impl FSTabEntry {
 	/// Mounts the given entry.
 	pub fn mount(&self) -> Result<(), Box<dyn Error>> {
 		let result = unsafe {
-			mount_fs(
-				CString::new(self.fs_spec.as_str())?.as_ptr(),
+			libc::mount(
+				CString::new(self.fs_spec.as_string())?.as_ptr(),
 				CString::new(self.fs_file.clone())?.as_ptr(),
 				CString::new(self.fs_vfstype.clone())?.as_ptr(),
 				0,      // TODO
@@ -92,15 +84,18 @@ impl FSTabEntry {
 			)
 		};
 
-		if result != 0 {
+		if result == 0 {
 			Ok(())
 		} else {
-			Err(format!(
-				"Failed to mount `{}` into `{}`!",
-				self.fs_spec.as_str(),
-				self.fs_file
+			Err(
+				format!(
+					"Failed to mount `{}` into `{}`: {}",
+					self.fs_spec.as_string(),
+					self.fs_file,
+					io::Error::last_os_error()
+				)
+				.into()
 			)
-			.into())
 		}
 	}
 }
@@ -161,7 +156,8 @@ fn consume_token(chars: &mut Peekable<Chars>) -> Option<String> {
 }
 
 /// Parses the given line.
-/// If no entry is present on the line or if the entry is invalid, the function returns None.
+///
+/// If no entry is present on the line or if the entry is invalid, the function returns `None`.
 fn parse_line(line: &str) -> Option<FSTabEntry> {
 	if line.is_empty() {
 		return None;
@@ -195,7 +191,7 @@ fn parse_line(line: &str) -> Option<FSTabEntry> {
 
 		match i {
 			// fs_spec
-			0 => fs_spec = Some(FSSpec::from_str(tok)),
+			0 => fs_spec = FSSpec::from_str(&tok).ok(),
 
 			// fs_file
 			1 => fs_file = Some(tok),
@@ -230,7 +226,9 @@ fn parse_line(line: &str) -> Option<FSTabEntry> {
 }
 
 /// Parses the fstab file and returns the list of entries.
-/// `path` is the path to the fstab file. If None, the function takes the default path.
+///
+/// `path` is the path to the fstab file./ If None, the function takes the default path.
+///
 /// Invalid entries are ignored.
 pub fn parse(path: Option<&str>) -> io::Result<Vec<FSTabEntry>> {
 	let mut entries = Vec::new();
