@@ -29,10 +29,10 @@ impl FromStr for FSSpec {
 	type Err = ();
 
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		if s.starts_with("LABEL=") {
-			Ok(Self::Label(String::from(&s[6..])))
-		} else if s.starts_with("UUID=") {
-			Ok(Self::Uuid(String::from(&s[5..])))
+		if let Some(label) = s.strip_prefix("LABEL=") {
+			Ok(Self::Label(String::from(label)))
+		} else if let Some(uuid) = s.strip_prefix("UUID=") {
+			Ok(Self::Uuid(String::from(uuid)))
 		} else {
 			Ok(Self::File(s.to_string()))
 		}
