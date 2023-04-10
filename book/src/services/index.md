@@ -6,7 +6,7 @@ A service is a daemon which is launched at system startup if enabled.
 
 ## Service descriptor
 
-Each service is described with a file, located in the directory `/etc/solfege/services`.
+Each service is described with a file, located in the directory `/usr/lib/solfege/services`.
 
 Each service descriptor is in TOML format. Example:
 

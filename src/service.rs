@@ -9,7 +9,7 @@ use std::process::Command;
 use std::ptr::null_mut;
 
 /// The path to the services directory.
-const SERVICES_PATH: &str = "/etc/solfege/services";
+const SERVICES_PATH: &str = "/usr/lib/solfege/services";
 
 /// The service's state.
 #[derive(Clone, Copy, Eq, PartialEq)]
