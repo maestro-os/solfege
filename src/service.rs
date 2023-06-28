@@ -185,7 +185,8 @@ impl Manager {
 
 	/// Returns the service with the given PID.
 	pub fn get_service(&mut self, pid: u32) -> Option<&mut Service> {
-		self.services.iter_mut()
+		self.services
+			.iter_mut()
 			.find(|s| s.process.as_ref().map(|c| c.id()) == Some(pid))
 	}
 
