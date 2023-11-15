@@ -3,6 +3,7 @@
 use serde::Deserialize;
 use std::fs;
 use std::io;
+use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::Child;
 use std::process::Command;
@@ -139,27 +140,31 @@ pub struct Manager {
 impl Manager {
 	/// Reads the list of services.
 	fn list() -> io::Result<Vec<Service>> {
+		let entries = match fs::read_dir(SERVICES_PATH) {
+			Ok(entries) => entries,
+			Err(e) if e.kind() == ErrorKind::NotFound => return Ok(vec![]),
+			Err(e) => return Err(e),
+		};
+
+		// TODO use collect
 		let mut services = Vec::new();
+		for entry in entries {
+			let entry = entry?;
+			let p = entry.path();
+			let file_type = entry.file_type()?;
 
-		let e = fs::read_dir(SERVICES_PATH)?;
-		for entry in e {
-			let e = entry?;
-			let p = e.path();
-			let file_type = e.file_type()?;
-
-			if file_type.is_file() {
-				let content = fs::read_to_string(p)?;
-
-				match toml::from_str::<ServiceDescriptor>(&content) {
-					Ok(desc) => services.push(Service::from(desc)),
-					Err(_e) => {
-						// TODO
-						todo!();
-					}
-				};
+			if !file_type.is_file() {
+				continue;
+			}
+			let content = fs::read_to_string(p)?;
+			match toml::from_str::<ServiceDescriptor>(&content) {
+				Ok(desc) => services.push(Service::from(desc)),
+				Err(_e) => {
+					// TODO
+					todo!();
+				}
 			}
 		}
-
 		Ok(services)
 	}
 
