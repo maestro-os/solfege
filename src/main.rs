@@ -18,14 +18,13 @@ const STARTUP_PROG_PATH: &str = "/etc/solfege/startup";
 
 /// Runs the startup command.
 fn startup() {
-	let prog = fs::read_to_string(STARTUP_PROG_PATH).unwrap_or_else(|err| {
-		eprintln!("Failed to open startup program configuration file: {}", err);
+	let path = fs::read_to_string(STARTUP_PROG_PATH);
+	let path = path.as_deref().map(str::trim).unwrap_or_else(|e| {
+		eprintln!("Failed to open startup program configuration file: {e}");
 		exit(1);
 	});
-	let prog = prog.trim();
-
-	Command::new(prog).spawn().unwrap_or_else(|err| {
-		eprintln!("Cannot run startup program: {}", err);
+	Command::new(path).spawn().unwrap_or_else(|e| {
+		eprintln!("Cannot run startup program: {e}");
 		exit(1);
 	});
 }
@@ -33,10 +32,10 @@ fn startup() {
 fn main() {
 	println!("Hello world!");
 	uname::set_hostname().unwrap_or_else(|e| {
-		eprintln!("Cannot set system's hostname: {}", e);
+		eprintln!("Cannot set system's hostname: {e}");
 	});
-	let uname = uname::UnameInfo::get().unwrap_or_else(|_| {
-		eprintln!("Cannot retrieve system informations with uname");
+	let uname = uname::UnameInfo::get().unwrap_or_else(|e| {
+		eprintln!("Cannot retrieve system informations with uname: {e}");
 		exit(1);
 	});
 	println!(
@@ -46,35 +45,35 @@ fn main() {
 
 	// Initialize TTY
 	println!("Initializing current TTY...");
-	tty::init().unwrap_or_else(|err| {
-		eprintln!("Failed to setup TTY: {}", err);
+	tty::init().unwrap_or_else(|e| {
+		eprintln!("Failed to setup TTY: {e}");
 		exit(1);
 	});
 
 	// Mounting default filesystems
 	println!("Mounting fstab filesystems...");
-	let fstab_entries = fstab::parse(None).unwrap_or_else(|err| {
-		eprintln!("Failed to read the fstab file: {}", err);
+	let fstab_entries = fstab::parse(None).unwrap_or_else(|e| {
+		eprintln!("Failed to read the fstab file: {e}");
 		exit(1);
 	});
-	for e in fstab_entries {
-		println!("Mounting `{}`...", e.get_path());
-		e.mount().unwrap_or_else(|err| {
-			eprintln!("Failed to mount `{}`: {}", e.get_path(), err);
+	for entry in fstab_entries {
+		println!("Mounting `{}`...", entry.get_path());
+		entry.mount().unwrap_or_else(|e| {
+			eprintln!("Failed to mount `{}`: {e}", entry.get_path());
 			exit(1);
 		});
 	}
 
 	// Loading default modules
 	println!("Loading default modules...");
-	module::load_default(&uname).unwrap_or_else(|err| {
-		eprintln!("Failed to load default modules: {}", err);
+	module::load_default(&uname).unwrap_or_else(|e| {
+		eprintln!("Failed to load default modules: {e}");
 		exit(1);
 	});
 
 	println!("Launching services...");
-	let mut services_manager = service::Manager::new().unwrap_or_else(|err| {
-		eprintln!("Failed to launch the services manager: {}", err);
+	let mut services_manager = service::Manager::new().unwrap_or_else(|e| {
+		eprintln!("Failed to launch the services manager: {e}");
 		exit(1);
 	});
 
