@@ -1,15 +1,18 @@
 //! This module handles the fstab file, which contains the list of filesystems to mount at boot.
 
+use std::convert::identity;
 use std::error::Error;
 use std::ffi::CString;
+use std::fmt::{Display, Formatter};
 use std::fs::File;
-use std::io;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::iter::Peekable;
+use std::path::Path;
 use std::ptr::null;
 use std::str::Chars;
 use std::str::FromStr;
+use std::{fmt, io};
 
 /// The path to the fstab file.
 const FSTAB_PATH: &str = "/etc/fstab";
@@ -39,13 +42,12 @@ impl FromStr for FSSpec {
 	}
 }
 
-impl FSSpec {
-	/// Returns a string corresponding to the spec.
-	pub fn as_string(&self) -> String {
+impl Display for FSSpec {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match self {
-			Self::File(s) => s.clone(),
-			Self::Label(s) => format!("LABEL={}", s),
-			Self::Uuid(s) => format!("UUID={}", s),
+			Self::File(s) => write!(f, "{s}"),
+			Self::Label(s) => write!(f, "LABEL={s}"),
+			Self::Uuid(s) => write!(f, "UUID={s}"),
 		}
 	}
 }
@@ -53,43 +55,38 @@ impl FSSpec {
 /// Structure representing an entry in the fstab file.
 pub struct FSTabEntry {
 	/// The source of the filesystem.
-	fs_spec: FSSpec,
+	pub fs_spec: FSSpec,
 	/// The file on which the filesystem will be mounted.
-	fs_file: String,
+	pub fs_file: String,
 	/// The filesystem type.
-	fs_vfstype: String,
+	pub fs_vfstype: String,
 	/// The mount options associated with the filesystem.
-	fs_mntops: Vec<String>,
+	pub fs_mntops: Vec<String>,
 	/// Tells whether the filesystem has to be dumped.
-	fs_freq: bool,
+	pub fs_freq: bool,
 	/// Tells the order in which fsck checks the filesystems.
-	fs_passno: u32,
+	pub fs_passno: u32,
 }
 
 impl FSTabEntry {
-	/// Returns the mountpath.
-	pub fn get_path(&self) -> &String {
-		&self.fs_file
-	}
-
 	/// Mounts the given entry.
 	pub fn mount(&self) -> Result<(), Box<dyn Error>> {
+		let spec = self.fs_spec.to_string();
 		let result = unsafe {
 			libc::mount(
-				CString::new(self.fs_spec.as_string())?.as_ptr(),
+				CString::new(spec.clone())?.as_ptr(),
 				CString::new(self.fs_file.clone())?.as_ptr(),
 				CString::new(self.fs_vfstype.clone())?.as_ptr(),
 				0,      // TODO
 				null(), // TODO
 			)
 		};
-
 		if result == 0 {
 			Ok(())
 		} else {
 			Err(format!(
 				"Failed to mount `{}` into `{}`: {}",
-				self.fs_spec.as_string(),
+				spec,
 				self.fs_file,
 				io::Error::last_os_error()
 			)
@@ -104,7 +101,6 @@ fn skip_whitespaces(chars: &mut Peekable<Chars>) {
 		if !c.is_whitespace() {
 			break;
 		}
-
 		chars.next();
 	}
 }
@@ -118,19 +114,16 @@ fn consume_token(chars: &mut Peekable<Chars>) -> Option<String> {
 	let mut quote = false;
 
 	while let Some(c) = chars.peek() {
-		if !quote && c.is_whitespace() {
+		if !quote && (c.is_whitespace() || *c == '#') {
 			break;
 		}
-
 		match c {
 			'"' => {
 				quote = !quote;
 				chars.next();
 			}
-
 			'\\' => {
 				chars.next();
-
 				if let Some(c) = chars.next() {
 					tok.push(c);
 					continue;
@@ -138,19 +131,13 @@ fn consume_token(chars: &mut Peekable<Chars>) -> Option<String> {
 					return None;
 				}
 			}
-
 			_ => {
 				tok.push(*c);
 				chars.next();
 			}
 		}
 	}
-
-	if !quote {
-		Some(tok)
-	} else {
-		None
-	}
+	(!quote).then_some(tok)
 }
 
 /// Parses the given line.
@@ -170,11 +157,9 @@ fn parse_line(line: &str) -> Option<FSTabEntry> {
 
 	// The current index in the entry
 	let mut i = 0;
-
 	let mut chars = line.chars().peekable();
 	while chars.peek().is_some() {
 		skip_whitespaces(&mut chars);
-
 		if let Some(c) = chars.peek() {
 			// On comment, stop parsing the line
 			if *c == '#' {
@@ -183,33 +168,24 @@ fn parse_line(line: &str) -> Option<FSTabEntry> {
 		} else {
 			break;
 		}
-
 		// Get the next token
 		let tok = consume_token(&mut chars)?;
-
 		match i {
 			// fs_spec
 			0 => fs_spec = FSSpec::from_str(&tok).ok(),
-
 			// fs_file
 			1 => fs_file = Some(tok),
-
 			// fs_vfstype
 			2 => fs_vfstype = Some(tok),
-
 			// fs_mntops
-			3 => fs_mntops = Some(tok.split(',').map(|s| s.to_owned()).collect::<Vec<_>>()),
-
+			3 => fs_mntops = Some(tok.split(',').map(str::to_owned).collect()),
 			// fs_freq
 			4 => fs_freq = Some(tok != "0"),
-
 			// fs_passno
 			5 => fs_passno = Some(tok.parse::<u32>().ok()?),
-
-			// If the line has too much entries, ignore it
+			// If the line has too many entries, ignore it
 			_ => return None,
 		}
-
 		i += 1;
 	}
 
@@ -228,21 +204,16 @@ fn parse_line(line: &str) -> Option<FSTabEntry> {
 /// `path` is the path to the fstab file. If `None`, the function takes the default path.
 ///
 /// Invalid entries are ignored.
-pub fn parse(path: Option<&str>) -> io::Result<Vec<FSTabEntry>> {
-	let mut entries = Vec::new();
-
-	let file = File::open(path.unwrap_or(FSTAB_PATH))?;
+pub fn parse(path: Option<&Path>) -> io::Result<Vec<FSTabEntry>> {
+	let path = path.map(Path::new).unwrap_or(Path::new(FSTAB_PATH));
+	let file = File::open(path)?;
 	let reader = BufReader::new(file);
-
-	for l in reader.lines() {
-		let l = l?;
-
-		if let Some(entry) = parse_line(&l) {
-			entries.push(entry);
-		}
-	}
-
-	Ok(entries)
+	reader
+		.lines()
+		.map(|l| Ok(parse_line(&l?)))
+		.map(Result::transpose)
+		.filter_map(identity)
+		.collect()
 }
 
 #[cfg(test)]
@@ -251,19 +222,19 @@ mod test {
 
 	#[test]
 	fn fstab_empty() {
-		let entries = parse(Some("tests/fstab/empty")).unwrap();
+		let entries = parse(Some(Path::new("tests/fstab/empty"))).unwrap();
 		assert!(entries.is_empty());
 	}
 
 	#[test]
 	fn fstab_comments_only() {
-		let entries = parse(Some("tests/fstab/comments_only")).unwrap();
+		let entries = parse(Some(Path::new("tests/fstab/comments_only"))).unwrap();
 		assert!(entries.is_empty());
 	}
 
 	#[test]
 	fn fstab_single() {
-		let entries = parse(Some("tests/fstab/single")).unwrap();
+		let entries = parse(Some(Path::new("tests/fstab/single"))).unwrap();
 		assert_eq!(entries.len(), 1);
 
 		assert_eq!(entries[0].fs_spec, FSSpec::File("/dev/sda1".to_string()));
@@ -276,7 +247,7 @@ mod test {
 
 	#[test]
 	fn fstab_several() {
-		let entries = parse(Some("tests/fstab/several")).unwrap();
+		let entries = parse(Some(Path::new("tests/fstab/several"))).unwrap();
 		assert_eq!(entries.len(), 3);
 
 		assert_eq!(entries[0].fs_spec, FSSpec::File("/dev/sda1".to_string()));

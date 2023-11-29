@@ -1,7 +1,6 @@
 //! This module implements a call to uname. Allowing to retrieve various informations.
 
 use libc::c_char;
-use std::ffi::CStr;
 use std::fs;
 use std::io;
 use std::mem;
@@ -25,8 +24,8 @@ pub struct UnameInfo {
 }
 
 /// Turns the given buffer into a `CStr`.
-fn to_cstr(buf: &[c_char]) -> &CStr {
-	unsafe { CStr::from_ptr(buf.as_ptr()) }
+fn array_to_string(buf: &[c_char]) -> String {
+	buf.iter().map(|b| (*b) as u8 as char).collect()
 }
 
 impl UnameInfo {
@@ -36,24 +35,13 @@ impl UnameInfo {
 	pub fn get() -> io::Result<Self> {
 		let mut uname_info = unsafe { mem::zeroed() };
 		let result = unsafe { libc::uname(&mut uname_info) };
-
 		if result == 0 {
 			Ok(UnameInfo {
-				sysname: to_cstr(&uname_info.sysname[..])
-					.to_string_lossy()
-					.into_owned(),
-				nodename: to_cstr(&uname_info.nodename[..])
-					.to_string_lossy()
-					.into_owned(),
-				release: to_cstr(&uname_info.release[..])
-					.to_string_lossy()
-					.into_owned(),
-				version: to_cstr(&uname_info.version[..])
-					.to_string_lossy()
-					.into_owned(),
-				machine: to_cstr(&uname_info.machine[..])
-					.to_string_lossy()
-					.into_owned(),
+				sysname: array_to_string(&uname_info.sysname[..]),
+				nodename: array_to_string(&uname_info.nodename[..]),
+				release: array_to_string(&uname_info.release[..]),
+				version: array_to_string(&uname_info.version[..]),
+				machine: array_to_string(&uname_info.machine[..]),
 			})
 		} else {
 			Err(io::Error::last_os_error())
@@ -65,10 +53,14 @@ impl UnameInfo {
 ///
 /// If the file is not present, the function doesn't do anything.
 pub fn set_hostname() -> io::Result<()> {
-	let hostname = fs::read(HOSTNAME_FILE)?;
-	let ret = unsafe { libc::sethostname(hostname.as_ptr() as _, hostname.len()) };
-
-	if ret == 0 {
+	// Read hostname file
+	let hostname = match fs::read(HOSTNAME_FILE) {
+		Ok(h) => h,
+		Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+		Err(e) => return Err(e),
+	};
+	let result = unsafe { libc::sethostname(hostname.as_ptr() as _, hostname.len()) };
+	if result == 0 {
 		Ok(())
 	} else {
 		Err(io::Error::last_os_error())

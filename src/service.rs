@@ -1,6 +1,7 @@
 //! This modules handles services.
 
 use serde::Deserialize;
+use std::convert::identity;
 use std::fs;
 use std::io;
 use std::io::ErrorKind;
@@ -97,7 +98,6 @@ impl Service {
 			self.process = Some(process);
 			self.state = ServiceState::Running;
 		}
-
 		Ok(())
 	}
 
@@ -106,7 +106,6 @@ impl Service {
 		if self.state == ServiceState::Running {
 			self.stop()?;
 		}
-
 		self.start()
 	}
 
@@ -116,9 +115,7 @@ impl Service {
 			process.kill()?;
 			self.process = None;
 		}
-
 		self.state = ServiceState::Stopped;
-
 		Ok(())
 	}
 
@@ -126,7 +123,6 @@ impl Service {
 	pub fn restart(&mut self) -> io::Result<()> {
 		self.stop()?;
 		self.start()?;
-
 		Ok(())
 	}
 }
@@ -145,27 +141,26 @@ impl Manager {
 			Err(e) if e.kind() == ErrorKind::NotFound => return Ok(vec![]),
 			Err(e) => return Err(e),
 		};
-
-		// TODO use collect
-		let mut services = Vec::new();
-		for entry in entries {
-			let entry = entry?;
-			let p = entry.path();
-			let file_type = entry.file_type()?;
-
-			if !file_type.is_file() {
-				continue;
-			}
-			let content = fs::read_to_string(p)?;
-			match toml::from_str::<ServiceDescriptor>(&content) {
-				Ok(desc) => services.push(Service::from(desc)),
-				Err(_e) => {
-					// TODO
-					todo!();
+		entries
+			.map(|entry| {
+				let entry = entry?;
+				let p = entry.path();
+				let file_type = entry.file_type()?;
+				if !file_type.is_file() {
+					return Ok(None);
 				}
-			}
-		}
-		Ok(services)
+				let content = fs::read_to_string(p)?;
+				match toml::from_str::<ServiceDescriptor>(&content) {
+					Ok(desc) => Ok(Some(Service::from(desc))),
+					Err(_e) => {
+						// TODO
+						todo!();
+					}
+				}
+			})
+			.map(Result::transpose)
+			.filter_map(identity)
+			.collect()
 	}
 
 	/// Creates a new instance.

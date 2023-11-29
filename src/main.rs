@@ -57,9 +57,9 @@ fn main() {
 		exit(1);
 	});
 	for entry in fstab_entries {
-		println!("Mounting `{}`...", entry.get_path());
+		println!("Mounting `{}`...", entry.fs_file);
 		entry.mount().unwrap_or_else(|e| {
-			eprintln!("Failed to mount `{}`: {e}", entry.get_path());
+			eprintln!("Failed to mount `{}`: {e}", entry.fs_file);
 			exit(1);
 		});
 	}
