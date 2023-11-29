@@ -25,7 +25,10 @@ pub struct UnameInfo {
 
 /// Turns the given buffer into a `CStr`.
 fn array_to_string(buf: &[c_char]) -> String {
-	buf.iter().map(|b| (*b) as u8 as char).collect()
+	buf.into_iter()
+		.take_while(|b| **b != 0)
+		.map(|b| (*b) as u8 as char)
+		.collect()
 }
 
 impl UnameInfo {
