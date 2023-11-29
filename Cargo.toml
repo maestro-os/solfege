@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 libc = "*"
 serde = { version = "1.0.159", features = ["derive"] }
-toml = "0.7.3"
+toml = "0.8.8"
 
 [build-dependencies]
 cc = "1.0"
