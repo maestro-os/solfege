@@ -14,6 +14,7 @@ jobs:
             - run: "cargo build --release"
     Test:
         runs-on: [self-hosted, linux]
+        needs: Build
         steps:
             - uses: actions/checkout@v2
             - run: "cargo test"
