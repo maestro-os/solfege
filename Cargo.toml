@@ -12,6 +12,5 @@ toml = "0.8.8"
 cc = "1.0"
 
 [profile.release]
-lto = true
 panic = "abort"
 strip = true
